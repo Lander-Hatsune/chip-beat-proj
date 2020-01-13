@@ -9,3 +9,5 @@ follow TC_demo v2.2, adjusted the manip.py
 but leaved the old version as old-manip.py
 
 corrected v2.2's known bugs
+
+maybe corrected manip.py's problem (to be tested)

@@ -1,4 +1,4 @@
-# for TC_Demo v2.2
+# for TC_Demo v2.2: uppercase command
 # ordinary remote control toy car
 import serial, time, sys
 import serial.tools.list_ports
@@ -60,25 +60,39 @@ def Motion(key):
         Put('A' * steer_thresh)
 
 # reverse car to original state
-def Restore(key):
+def Restore(key, a_key, d_key):
     if key in (move_fwrd, move_back):
         print("stop motor")
         Put('X')
-    elif key in (steer_left, steer_right):
-        print("originate steer")
-        Put('Z')
+    elif key == steer_left:
+        if not d_key:
+            print("originate from left")
+            Put('Z')
+        else: print("ignored originate from left")
+    elif key == steer_right:
+        if not a_key:
+            print("originate from right")
+            Put('Z')
+        else: print("ignored originate from right")
 
     
 def main():
     screen = pygame.display.set_mode((640, 480))
-    pygame.display.set_caption("car manip")
+    pygame.display.set_caption("car manual manip")
     background = pygame.Surface(screen.get_size())
     background = background.convert()
     background.fill((50, 50, 50))
     screen.blit(background, (0, 0))
     clock = pygame.time.Clock()
     while 1:
-        clock.tick(60)
+        clock.tick(frame_spd)
+        
+        # cover released keys' call to 'Restore()' func,
+        # if the opposite key has been pushed
+        keylist = pygame.key.get_pressed()
+        a_key = keylist[K_a]
+        d_key = keylist[K_d]
+        
         for event in pygame.event.get():
             if event.type == QUIT:
                 return
@@ -86,7 +100,7 @@ def main():
                 if event.key == K_ESCAPE: return
                 Motion(event.key)
             elif event.type == KEYUP:
-                Restore(event.key)
+                Restore(event.key, a_key, d_key)
 
         
         
