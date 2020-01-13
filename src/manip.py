@@ -1,3 +1,5 @@
+# for TC_Demo v2.2
+# ordinary remote control toy car
 import serial, time, sys
 import serial.tools.list_ports
 import pygame
@@ -24,7 +26,7 @@ port_name = 'COM7'
 bps = 9600
 waiting_time = 0.5
 #2 about manip
-frame_spd = 60
+frame_spd = 100
 move_fwrd = K_w
 move_back = K_s
 steer_left = K_a
@@ -46,10 +48,10 @@ def Put(msg):
 def Motion(key):
     if key == move_fwrd:
         print("forwarding")
-        Put('W' * motor_thresh)
+        Put('S' * motor_thresh)
     elif key == move_back:
         print("backing")
-        Put('S' * motor_thresh)
+        Put('W' * motor_thresh)
     elif key == steer_right:
         print("right steering")
         Put('D' * steer_thresh)
