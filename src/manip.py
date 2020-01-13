@@ -7,15 +7,15 @@ from pygame.locals import *
 **Aurix Keymap**
 
 *preset:
-'w': motor forward
-'s': motor backward
-'a': steer left
-'d': steer right
-'e': all clear
+'W': motor forward
+'S': motor backward
+'A': steer left
+'D': steer right
+'E': all clear
 
 *adjusted set
-'z': steer origin
-'x': motor origin
+'Z': steer origin
+'X': motor origin
 '''
 
 # basic parameters --begin
@@ -46,25 +46,25 @@ def Put(msg):
 def Motion(key):
     if key == move_fwrd:
         print("forwarding")
-        Put('w' * motor_thresh)
+        Put('W' * motor_thresh)
     elif key == move_back:
         print("backing")
-        Put('s' * motor_thresh)
+        Put('S' * motor_thresh)
     elif key == steer_right:
         print("right steering")
-        Put('d' * steer_thresh)
+        Put('D' * steer_thresh)
     elif key == steer_left:
         print("left steering")
-        Put('a' * steer_thresh)
+        Put('A' * steer_thresh)
 
 # reverse car to original state
 def Restore(key):
     if key in (move_fwrd, move_back):
         print("stop motor")
-        Put('x')
+        Put('X')
     elif key in (steer_left, steer_right):
         print("originate steer")
-        Put('z')
+        Put('Z')
 
     
 def main():

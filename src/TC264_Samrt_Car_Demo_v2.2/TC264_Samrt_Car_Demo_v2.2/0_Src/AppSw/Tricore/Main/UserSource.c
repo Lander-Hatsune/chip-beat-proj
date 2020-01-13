@@ -86,11 +86,15 @@ void UserCpu0Main(void) //ÑùÀý£ºÀ¶ÑÀÒ£¿ØÐ¡³µ
 
 			break;
 		case 'Z':
+                    myangle = 0;
 			ctldata='z';
+                        steer_angle(myangle);
 			Bluetooth_Send_Data(ctldata);
 			break;
 		case 'X':
+                    myduty = 0;
 			ctldata='x';
+                        motor_duty(myduty);
 			Bluetooth_Send_Data(ctldata);
 			break;
 		case 'C':

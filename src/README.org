@@ -1,0 +1,8 @@
+#+STARTUP: indent
+#+TITLE: code here
+* upd log
+** <2020-01-13 ÖÜÒ»>: 
+
+adjusted TC_demo v2.2
+
+follow TC_demo v2.2, adjusted the manip.py
