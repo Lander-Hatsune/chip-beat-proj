@@ -1,0 +1,2 @@
+本例程实现一个蓝牙遥控小车
+主程序位于\TC264_Samrt_Car_Demo_v2.0\0_Src\AppSw\Tricore\Main\Cpu0_Main.c
