@@ -76,7 +76,17 @@ void UserCpu0Main(void) //ÑùÀý£ºÀ¶ÑÀÒ£¿ØÐ¡³µ
 				 motor_duty(myduty);
 				 steer_angle(myangle);
 				break;
-		    case 'e':// stop
+                    case 'z':// steer originate
+                        myangle = 0;
+                        ctldata = 'Z';
+                        steer_angle(myangle);
+                        break;
+                    case 'x':// motor stop
+                        myduty = 0;
+                        ctldata = 'X';
+                        motor_duty(myduty);
+                        break;
+		    case 'e':// general stop
 		    	myangle=0;
 		    	myduty=0;
 				ctldata='E';
