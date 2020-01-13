@@ -54,8 +54,9 @@ IFX_EXTERN void GpioInit(void);
 #define MAXLEFTPWM 5
 #define MIDPWM 7.5
 #define MAXRIGHTPWM 10
-IFX_EXTERN uint32 SetMotor(float direction, float pwmDuty);//电机操作函数 方向+占空比（%）
-IFX_EXTERN uint32 SetSteer(float direction, float pwmDuty);//舵机操作函数 方向+占空比（%）
+// two 'float's have been changed into 'int's
+IFX_EXTERN uint32 SetMotor(int direction, float pwmDuty);//电机操作函数 方向+占空比（%）
+IFX_EXTERN uint32 SetSteer(int direction, float pwmDuty);//舵机操作函数 方向+占空比（%）
 
 
 /******************************捕获中断相关************************************************/
