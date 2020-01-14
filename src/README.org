@@ -1,13 +1,6 @@
 #+STARTUP: indent
-#+TITLE: code here
+#+TITLE: self-driving car code here
 * upd log
-** <2020-01-13 周一>: 
+** <2020-01-14 周二>: 
 
-adjusted TC_demo v2.2
-
-follow TC_demo v2.2, adjusted the manip.py
-but leaved the old version as old-manip.py
-
-corrected v2.2's known bugs
-
-maybe corrected manip.py's problem (to be tested)
+created the repo based on the remote control demo
