@@ -1,9 +1,9 @@
-* S&RC v1.0
+*Stable-S&RC v1.0
 ** speciality
-*** stable on bluetooth RC control, unstable on Self driving
-*** unable to transmit pictures with camera, bps = 9600
-*** good enough elec-mag system
-** to to
+*stable on bluetooth RC control, stable on Self driving*
+*unable to transmit pictures with camera, bps = 9600*
+*good enough elec-mag system*
+** to do
 better PID of encoder
 
 camera image process apply
