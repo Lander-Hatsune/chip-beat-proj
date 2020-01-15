@@ -1,0 +1,14 @@
+#+STARTUP: indent
+#+TITLE: self-driving car code here
+* upd log
+** <2020-01-14 周二>: 
+
+created the repo based on the remote control demo_v2.2modified
+
+integrated with RC version, done the switch program
+** <2020-01-15 周三>:
+optimize magnet system
+
+camera system (not done)
+
+bettered the mag system

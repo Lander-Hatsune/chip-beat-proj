@@ -1,4 +1,9 @@
-* chip-beat-proj
-The file repository by team 'CB' for the THU 2019 Chip Beat Project.
+* Stable-S&RC v1.0
+** speciality
+*stable on bluetooth RC control, stable on Self driving*
+*unable to transmit pictures with camera, bps = 9600*
+*good enough elec-mag system*
+** to do
+better PID of encoder
 
-TATP, Roufean, LdrX, ZL
+camera image process apply
