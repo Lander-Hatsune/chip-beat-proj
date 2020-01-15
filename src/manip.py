@@ -1,4 +1,4 @@
-# for TC_Demo v2.2: uppercase command
+# for TC_Sv1.0: uppercase command
 # ordinary remote control toy car
 import serial, time, sys
 import serial.tools.list_ports
@@ -22,18 +22,22 @@ from pygame.locals import *
 
 # basic parameters --begin
 #1 about serial
-port_name = 'COM7'
-bps = 9600
-waiting_time = 0.5
+_port_name = 'COM7'
+_bps = 9600
+_time_out = 0.5
+_write_time_out = 0.5
+_parity = serial.PARITY_NONE
+_stopbits = 1
+_bytesize = 8
 #2 about manip
-frame_spd = 100
-move_fwrd = K_w
-move_back = K_s
-steer_left = K_a
-steer_right = K_d
+_frame_spd = 100
+_move_fwrd = K_w
+_move_back = K_s
+_steer_left = K_a
+_steer_right = K_d
 #3 moving and turning constants
-motor_thresh = 70
-steer_thresh = 50
+_motor_thresh = 100
+_steer_thresh = 50
 # basic parameters --end
 
 # serial output
@@ -46,30 +50,30 @@ def Put(msg):
 
 # steering and motoring of car
 def Motion(key):
-    if key == move_fwrd:
+    if key == _move_fwrd:
         print("forwarding")
-        Put('S' * motor_thresh)
-    elif key == move_back:
+        Put('S' * _motor_thresh)
+    elif key == _move_back:
         print("backing")
-        Put('W' * motor_thresh)
-    elif key == steer_right:
+        Put('W' * _motor_thresh)
+    elif key == _steer_right:
         print("right steering")
-        Put('D' * steer_thresh)
-    elif key == steer_left:
+        Put('D' * _steer_thresh)
+    elif key == _steer_left:
         print("left steering")
-        Put('A' * steer_thresh)
+        Put('A' * _steer_thresh)
 
 # reverse car to original state
 def Restore(key, a_key, d_key):
-    if key in (move_fwrd, move_back):
+    if key in (_move_fwrd, _move_back):
         print("stop motor")
         Put('X')
-    elif key == steer_left:
+    elif key == _steer_left:
         if not d_key:
             print("originate from left")
             Put('Z')
         else: print("ignored originate from left")
-    elif key == steer_right:
+    elif key == _steer_right:
         if not a_key:
             print("originate from right")
             Put('Z')
@@ -85,7 +89,7 @@ def main():
     screen.blit(background, (0, 0))
     clock = pygame.time.Clock()
     while 1:
-        clock.tick(frame_spd)
+        clock.tick(_frame_spd)
         
         # cover released keys' call to 'Restore()' func,
         # if the opposite key has been pushed
@@ -107,12 +111,17 @@ def main():
 if __name__ == '__main__':
     # open serial
     try:
-        ser = serial.Serial(port_name, bps, timeout = waiting_time)
+        ser = serial.Serial(_port_name, _bps,
+                            timeout = _time_out)
         if ser.is_open:
             print("info:", ser)
+            ser.bytesize = _bytesize
+            ser.parity = _parity
+            ser.stopbits = _stopbits
+            
             
     except Exception as msg:
-        print("cannot connect to serial:", port_name)
+        print("cannot connect to serial:", _port_name)
         #raise SystemExit(msg)
     
     main()
