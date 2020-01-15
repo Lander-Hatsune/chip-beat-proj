@@ -22,7 +22,7 @@ from pygame.locals import *
 
 # basic parameters --begin
 #1 about serial
-_port_name = 'COM7'
+_port_name = 'COM8'
 _bps = 9600
 _time_out = 0.5
 _write_time_out = 0.5

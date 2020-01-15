@@ -119,21 +119,24 @@ void RemoteControl(void) {
 
 int circle_flag = 0;
 void SelfDrive(void) {
-
+//&& freq_sum
     // relevant constants --begin
     int mag_delta_thresh = 100;// when to start steering
-    double mag_delta_kp = 0.06;
+    double mag_delta_kp = 0.024;
     int steer_limit = 100;     // max steering limit
-    int motor_speed = 40;
+    int motor_speed = 60;
     int rev_thresh = 800;
     int mag_circle_judge = 5000;//judge to cross a circle
     int mag_circle_sideroad = 7500;//judge to choose a sideroad
-    int mag_singalline = 3500;
+    int mag_singalline = 4500;
+    int mag_side_doubleline = 4500;
     // constants --end
-
+	
     int mag_sum = 0, mag_delta = 0, myangle = 0;
     int left_mag_sum = 0, right_mag_sum = 0;
-
+    /*****jyf edit 1/15 17:56*****/
+    int keep_start = 0, keep_now = 0;
+    //edit end
     _myangle_window = &myangle;
     _myduty_window = &motor_speed;
 
@@ -144,24 +147,37 @@ void SelfDrive(void) {
     	// left minus right
     	left_mag_sum = VADCresult[2] + VADCresult[3];
     	right_mag_sum = VADCresult[4] + VADCresult[5];
-
-    	if (right_mag_sum > mag_circle_judge && abs(VADCresult[1] - VADCresult[6]) > 2000) {
-            circle_flag = 1;//右侧出现多赛道
-    	} else if (left_mag_sum > mag_circle_judge && abs(VADCresult[1] - VADCresult[6]) > 2000) {
-            circle_flag = -1;//左侧出现多赛道
+	
+        if (circle_flag == 0) {
+            if (right_mag_sum > mag_circle_judge && abs(VADCresult[1] - VADCresult[6]) > 1700) {
+                circle_flag = 1;//右侧出现多赛道
+                keep_start = timecounter10;
+            } else if (left_mag_sum > mag_circle_judge && abs(VADCresult[1] - VADCresult[6]) > 1700) {
+                circle_flag = -1;//左侧出现多赛道
+                keep_start = timecounter10;
+            }
+        }
+        if (circle_flag != 0) {
+            keep_now++;
+        }
+        if (circle_flag == 1 && keep_now - keep_start < 20) {
+            right_mag_sum = mag_side_doubleline;
+        } else if (circle_flag == -1 && keep_now - keep_start < 20) {
+            left_mag_sum  = mag_side_doubleline;
+        }
+    	if (circle_flag == 1 && mag_sum > mag_circle_sideroad && keep_now - keep_start > 50) {
+            left_mag_sum  = mag_side_doubleline;//右侧出现多赛道，屏蔽左电磁值
+    	} else if (circle_flag == -1 && mag_sum > mag_circle_sideroad && keep_now > 50) {
+            right_mag_sum = mag_side_doubleline;//左侧出现多赛道，屏蔽右电磁值
     	}
-
-    	if (circle_flag == 1 && mag_sum > mag_circle_sideroad) {
-            left_mag_sum  = 3000;//右侧出现多赛道，屏蔽左电磁值
-    	} else if (circle_flag == -1 && mag_sum > mag_circle_sideroad) {
-            right_mag_sum = 3000;//左侧出现多赛道，屏蔽右电磁值
-    	}
-    	if (circle_flag == 1 && mag_sum < mag_singalline) {
+    	if (circle_flag == 1 && mag_sum < mag_singalline && keep_now > 150) {
             circle_flag = 0;//若驶出多股赛道，恢复单赛道状态
-    	} else if (circle_flag == -1 && mag_sum < mag_singalline) {
+            keep_now = 0;
+    	} else if (circle_flag == -1 && mag_sum < mag_singalline && keep_now > 150) {
             circle_flag = 0;
+            keep_now = 0;
     	}
-
+        
     	mag_delta = left_mag_sum - right_mag_sum;
         if (mag_delta > mag_delta_thresh) {
             myangle = mag_delta_kp * mag_delta;
@@ -169,12 +185,6 @@ void SelfDrive(void) {
         } else if (mag_delta < -mag_delta_thresh) {
             myangle = mag_delta_kp * mag_delta;
             if (myangle < -steer_limit) myangle = -steer_limit;
-        } else if (left_mag_sum < right_mag_sum &&
-                   left_mag_sum < rev_thresh) {
-            myangle = steer_limit;// steer right
-        } else if (right_mag_sum < left_mag_sum &&
-                   right_mag_sum < rev_thresh) {
-            myangle = -steer_limit;// steer left
         } else myangle = 0;
 
         steer_angle(myangle);
@@ -234,7 +244,8 @@ void UserCpu1Main(void) {
 //该函数每10ms执行一次，请在该函数中书写程序，中断时间有限，不要太长
 uint32 UserInterupt10ms(void)
 {
-	return 0;
+    timecounter10++;
+    return 0;
 }
 //该函数每100ms执行一次，请在该函数中书写程序，中断时间有限，不要太长
 //样例，获取编码器输出频率与超声举例
