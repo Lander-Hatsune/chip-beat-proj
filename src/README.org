@@ -9,4 +9,6 @@ integrated with RC version, done the switch program
 ** <2020-01-15 ÖÜÈý>:
 optimize magnet system
 
-camera system
+camera system (not done)
+
+bettered the mag system

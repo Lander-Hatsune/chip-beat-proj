@@ -5,6 +5,7 @@
 #include "UserSource.h"
 #include "ServeSource.h"
 #include "VadcApp.h"
+//#include "PicProcess.c"
 int timecounter10=0;
 
 /******************************************************************************/
@@ -116,15 +117,18 @@ void RemoteControl(void) {
     _myduty_window = NULL;
 }
 
-
+int circle_flag = 0;
 void SelfDrive(void) {
-    
+
     // relevant constants --begin
     int mag_delta_thresh = 100;// when to start steering
     double mag_delta_kp = 0.06;
     int steer_limit = 100;     // max steering limit
     int motor_speed = 40;
     int rev_thresh = 800;
+    int mag_circle_judge = 5000;//judge to cross a circle
+    int mag_circle_sideroad = 7500;//judge to choose a sideroad
+    int mag_singalline = 3500;
     // constants --end
 
     int mag_sum = 0, mag_delta = 0, myangle = 0;
@@ -132,15 +136,33 @@ void SelfDrive(void) {
 
     _myangle_window = &myangle;
     _myduty_window = &motor_speed;
-    
+
     while (1) {
-        VADCresult_run();
-        mag_sum = VADCresult[2] + VADCresult[3] + VADCresult[4] + VADCresult[5];
-        // left minus right
-        mag_delta = VADCresult[2] + VADCresult[3] - VADCresult[4] - VADCresult[5];
-        left_mag_sum = VADCresult[2] + VADCresult[3];
-        right_mag_sum = VADCresult[4] + VADCresult[5];
-        
+    	myangle = 0;
+    	VADCresult_run();
+    	mag_sum = VADCresult[2] + VADCresult[3] + VADCresult[4] + VADCresult[5];
+    	// left minus right
+    	left_mag_sum = VADCresult[2] + VADCresult[3];
+    	right_mag_sum = VADCresult[4] + VADCresult[5];
+
+    	if (right_mag_sum > mag_circle_judge && abs(VADCresult[1] - VADCresult[6]) > 2000) {
+            circle_flag = 1;//右侧出现多赛道
+    	} else if (left_mag_sum > mag_circle_judge && abs(VADCresult[1] - VADCresult[6]) > 2000) {
+            circle_flag = -1;//左侧出现多赛道
+    	}
+
+    	if (circle_flag == 1 && mag_sum > mag_circle_sideroad) {
+            left_mag_sum  = 3000;//右侧出现多赛道，屏蔽左电磁值
+    	} else if (circle_flag == -1 && mag_sum > mag_circle_sideroad) {
+            right_mag_sum = 3000;//左侧出现多赛道，屏蔽右电磁值
+    	}
+    	if (circle_flag == 1 && mag_sum < mag_singalline) {
+            circle_flag = 0;//若驶出多股赛道，恢复单赛道状态
+    	} else if (circle_flag == -1 && mag_sum < mag_singalline) {
+            circle_flag = 0;
+    	}
+
+    	mag_delta = left_mag_sum - right_mag_sum;
         if (mag_delta > mag_delta_thresh) {
             myangle = mag_delta_kp * mag_delta;
             if (myangle > steer_limit) myangle = steer_limit;
@@ -154,7 +176,7 @@ void SelfDrive(void) {
                    right_mag_sum < rev_thresh) {
             myangle = -steer_limit;// steer left
         } else myangle = 0;
-        
+
         steer_angle(myangle);
         motor_duty(-motor_speed);// why neg?
     }
@@ -169,10 +191,44 @@ void UserCpu0Main(void) {
         SelfDrive();
     } else RemoteControl();
 }
+
+/*
+void Conv(int strd, int h, int w) {
+    int kernal[3][3] = {{1, 0, -1},
+                        {2, 0, -2},
+                        {1, 0, -1}};
+    for (int i = 0; i <= h - strd + 1; i += strd) {
+        for (int j = 0; j <= w - strd + 1; j += strd) {
+            int temp_sum = 0;
+            for (int ki = 0; ki < 3; ki++)
+                for (int kj = 0; kj < 3; kj++)
+                    temp_sum += kernal[ki][kj] * pic[i + ki][j + kj];
+            if (temp_sum > thresh) {
+                convout[i][j] = '#';
+            }else if (temp_sum < -thresh) {
+                convout[i][j] = '|';
+            }
+        }
+    }
+}*/
+
 //CPU1主函数，置于循环中，摄像头读写由此核处理，建议用于摄像头相关计算：
 //不要写成死循环，后面有AD相关处理
 void UserCpu1Main(void) {
-	imageRead();
+    // for test
+    //imageRead();
+    //delay_ms(10);
+
+    //----------image process and evaluate----------//
+
+    // the picture: unsigned int pic[121][161]
+    /*
+    int height = 120, width = 160;
+    int conv_h = (height + 1) / 2, conv_w = (width + 1) / 2;
+    
+    int conv_result[121][161];
+    Conv(2, *conv_result, 120, (height + 1) / 2, (width + 1) / 2);
+    */
 }
 /**************************************中断调用函数****************************************/
 //该函数每10ms执行一次，请在该函数中书写程序，中断时间有限，不要太长

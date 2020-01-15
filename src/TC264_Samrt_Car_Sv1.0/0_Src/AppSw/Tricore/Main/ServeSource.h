@@ -40,7 +40,7 @@ IFX_EXTERN void SetLed(int k, int light); //设置led灯
 IFX_EXTERN int GetKey(int k);
 
 /**********************************蓝牙串口相关***************************************/
-#define BAUDRATE 9600 //蓝牙波特率
+#define BAUDRATE 115200 //蓝牙波特率// adjusted from 9600
 IFX_EXTERN uint8 Bluetooth_Read_Data(void);
 IFX_EXTERN void Bluetooth_Send_Data(uint8 data);
 IFX_EXTERN int GetDip(int k);

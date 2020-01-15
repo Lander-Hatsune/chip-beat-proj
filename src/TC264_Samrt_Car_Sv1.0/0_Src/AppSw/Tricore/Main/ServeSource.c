@@ -239,14 +239,14 @@ void imageRead(void)//利用串口发送摄像头数据，与摄像头上位机配合
 			Asclin_Send_Data(0x01);
 			delay(0.0001);
 			//			SCI_Send(0xfe);
-			Asclin_Send_Data(0xfe);
+			Asclin_Send_Data(0xff);// adjusted from 0xfe
 			delay(0.0001);
 		}
 
 		delay(0.001);
-		for(m=0;m<100;m++)
+		for(m=0;m<120;m++)// adjusted from 100, should be 120
 		{
-			for(n=0;n<150;n++)
+			for(n=0;n<160;n++)// adjusted from 150, should be 160
 			{
 				Asclin_Send_Data(pic[m][n]);
 				delay(0.0001);
