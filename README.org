@@ -1,4 +1,4 @@
-*Stable-S&RC v1.0
+* Stable-S&RC v1.0
 ** speciality
 *stable on bluetooth RC control, stable on Self driving*
 *unable to transmit pictures with camera, bps = 9600*
