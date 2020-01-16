@@ -301,9 +301,9 @@ uint32 ServeInterupt100ms(void)//
 //	bo4 = GetDip(4);
 //
 	SetLed(1,GetDip(1));
-	SetLed(2,GetDip(2));
-	SetLed(3,GetDip(3));
-	SetLed(4,GetDip(4));
+	//SetLed(2,GetDip(2));// ÒÑ×¢ÊÍ
+	//SetLed(3,GetDip(3));
+	//SetLed(4,GetDip(4));
 //AD
 	//VADCresult_run();
 	cap_trigger();

@@ -15,8 +15,9 @@ int timecounter10 = 0;
 uint8 ctldata=0;
 int CodePerid = 0;
 int CodePerid_prev = 0;
-int yaw_angle_start = 0;
-int yaw_angle_now = 0;
+float yaw_angle_start = 0;
+float yaw_angle_now = 0;
+float keep_start = 0.0, keep_now = 0.0;
 float distance;
 uint8 reed_state = 0;// 0 with magnet
 /******************************************************************************/
@@ -25,19 +26,19 @@ uint8 reed_state = 0;// 0 with magnet
 //函数及函数用法
 void motor_duty(int duty)//样例用户自身舵机函数
 {
-	if (duty>0)
-		SetMotor(FORWARD, duty);
-	else
-		SetMotor(BACKWARD, -duty);
+    if (duty>0)
+        SetMotor(FORWARD, duty);
+    else
+        SetMotor(BACKWARD, -duty);
 }
 void steer_angle(int duty)
 {
-	if (duty>0)
-		SetSteer(LEFT, duty);
-	else if(duty<0)
-		SetSteer(RIGHT, -duty);
-	else
-		SetSteer(MIDDLE, duty);
+    if (duty>0)
+        SetSteer(LEFT, duty);
+    else if(duty<0)
+        SetSteer(RIGHT, -duty);
+    else
+        SetSteer(MIDDLE, duty);
 }
 
 // global variables as windows to watch
@@ -122,111 +123,159 @@ void RemoteControl(void) {
     _myduty_window = NULL;
 }
 
-unsigned int abs(int num) {
-	if (num < 0) {
-		return -num;
-	} else {
-		return num;
-	}
+float abs(float num) {
+    return num < 0.0 ? -num : num;
 }
 
 int circle_flag = 0;
+int circle_flag_2 = 0;
 void SelfDrive(void) {
-	//&& freq_sum
+    //&& freq_sum
     // relevant constants --begin
-    int mag_delta_thresh = 100;// when to start steering
-    double mag_delta_kp = 0.04;//wait to chagne
-    int steer_limit = 100;     // max steering limit
-	int speed_set = 60;
-    int mag_circle_sum_judge = 8000;//judge to cross a circle
-	int mag_circle_oneside_judge = 4000;
-    int mag_singalline = 5000;
-    int mag_VADC3or4_doubleline = 2000;
-	float kp_enc_motor = 1.33;
-	float kp_enc_angle = 0.3;
-	int CodePerid_target = 6000;
-	float circle_peird = 0.5;
 	int light_angle = 90;
+    int mag_delta_thresh = 100;// when to start steering
+    double mag_delta_kp = 0.04;//wait to change
+    int steer_limit = 100;     // max steering limit
+    int speed_set = 60;
+	int speed_min = 20;
+    int mag_circle_sum_judge = 9000;//judge to cross a circle
+    int mag_circle_oneside_judge = 4000;
+    int mag_singalline = 5000;
+    int mag_VADC3or4_doubleline = 1000;
+    float kp_enc_motor = 1.33;
+    float kp_enc_angle = 0.3;
+    int CodePerid_target = 4000;//原设置数据为6000，17日凌晨调试时电量充满，调整为4000
+    float circle_peird = 1;
+	float leave_circle_time = 2;
     // constants --end
 	
     int motor_speed = 0;
     int mag_sum = 0, mag_delta = 0, myangle = 0;
-    int left_mag_sum = 0, right_mag_sum = 0, mag_oneside;
-    /*****jyf edit 1/15 17:56*****/
-    float keep_start = 0.0, keep_now = 0.0;
-    //edit end
+    int left_mag_sum = 0, right_mag_sum = 0, mag_oneside = 0;
+	float keep_start_2 = 0.0, keep_now_2 = 0.0;
+
     _myangle_window = &myangle;
     _myduty_window = &motor_speed;
     
     
-    //死程序右转出车库
-    while (1) {
+	/*
+    //右转出车库
+    while (1) {//直线出赛道 直到感受到磁力
         myangle = 0;
         motor_speed = 40;
-        if (CodePerid < 300) motor_speed = 80; 
+        if (CodePerid < 300) motor_speed = 80;//门阈值启动电机 
         steer_angle(myangle);
         motor_duty(-motor_speed);// why neg?
-        if (reed_state) break;
+        if (!reed_state) break;
     }
-	yaw_angle_start = mpudata_int[6];// counter-clockwise: +
+    yaw_angle_start = mpudata_int[6];// counter-clockwise: +  记录起始陀螺仪
     while (1) {
-        myangle = -90;
-		yaw_angle_now = mpudata_int[6];
-		motor_speed = 40;
-		if (CodePerid < 500) motor_speed = 80;
-		if (abs(yaw_angle_now - yaw_angle_start) > light_angle - 15) break;
-		steer_angle(myangle);
+        myangle = -90;//右转出赛道
+        yaw_angle_now = mpudata_int[6];//更新陀螺仪
+        motor_speed = 40;
+        if (CodePerid < 500) motor_speed = 80;
+        if (abs(yaw_angle_now - yaw_angle_start) > light_angle - 15) break;
+        steer_angle(myangle);
         motor_duty(-motor_speed);// why neg?
     }
+	*/
     
-    //开始自主巡线阶段 
+    //开始自主巡线阶段
+    SetLed(2, 1);
+    SetLed(3, 1);
+    SetLed(4, 1);
+    circle_flag = 0;
     while (1) {
     	myangle = 0;
     	VADCresult_run();
-    	mag_sum = VADCresult[2] + VADCresult[3] + VADCresult[4] + VADCresult[5];
+    	mag_sum = VADCresult[1] + VADCresult[2] + VADCresult[3] +
+            VADCresult[4] + VADCresult[5] + VADCresult[6];
     	// left minus right
     	left_mag_sum  = VADCresult[1] + VADCresult[2];
     	right_mag_sum = VADCresult[5] + VADCresult[6];
-		mag_delta = VADCresult[3] - VADCresult[4];
+        mag_delta = VADCresult[3] - VADCresult[4];
         mag_oneside = VADCresult[5] + VADCresult[6] -VADCresult[1] - VADCresult[2];
-		
-		if (circle_flag == 0) {
-            if (mag_sum > mag_circle_sum_judge && mag_oneside > mag_circle_oneside_judge && abs(VADCresult[1] - VADCresult[6]) > 2000) {
+        //right minus left
+        if (circle_flag == 0) {
+            if (mag_sum > mag_circle_sum_judge &&
+                mag_oneside > mag_circle_oneside_judge &&
+                VADCresult[6] - VADCresult[1] > 2000) {
+                
                 circle_flag = 1;//右侧出现多赛道
-                keep_start = (float)timecounter10 / 100;
-				yaw_angle_start = mpudata_int[6];
-            } else if (mag_sum > mag_circle_sum_judge && mag_oneside < -mag_circle_oneside_judge && abs(VADCresult[1] - VADCresult[6]) > 2000) {
+                SetLed(4, 0);//稍后可注释  0是亮
+                keep_start = (float)timecounter10 / 100;//开始记录时间
+                yaw_angle_start = mpudata_int[6];//开始记录yaw
+
+            } else if (mag_sum > mag_circle_sum_judge &&
+                       mag_oneside < -mag_circle_oneside_judge &&
+                       VADCresult[1] - VADCresult[6] > 2000) {
+
                 circle_flag = -1;//左侧出现多赛道
+                SetLed(3, 0);//稍后可注释
                 yaw_angle_start = mpudata_int[6];
-				keep_start = (float)timecounter10 / 100;
+                keep_start = (float)timecounter10 / 100;
+
             }
         }//判定进入环岛
         if (circle_flag != 0) {
-            keep_now = (float)timecounter10 / 100;//keep 单位是s
-			if (mpudata_int[6] != 0) {
-				yaw_angle_now = mpudata_int[6];				
-			}
-			if (keep_now - keep_start < circle_peird) mag_delta = 0;
-		}//进入环岛开始计时
+            keep_now = (float)timecounter10 / 100;//更新时间的值 单位是s
+            if (mpudata_int[6] != 0) //更新陀螺仪的数值
+                yaw_angle_now = mpudata_int[6];
+            if (keep_now - keep_start < circle_peird) mag_delta = 0;//0.x秒之内不调整角度
+        }//进入环岛开始计时 记录陀螺仪
 
-    	if (circle_flag == 1 && mag_sum > mag_circle_sum_judge && keep_now - keep_start > circle_peird && abs(yaw_angle_now - yaw_angle_start) < light_angle) {
+    	if (circle_flag == 1 && mag_sum > mag_circle_sum_judge &&
+            keep_now - keep_start > circle_peird &&
+            abs(yaw_angle_now - yaw_angle_start) < light_angle) {
+
             mag_delta = mag_VADC3or4_doubleline - VADCresult[4];//右侧出现多赛道，分岔路屏蔽左电磁值
-    	} else if (circle_flag == -1 && mag_sum > mag_circle_sum_judge && keep_now - keep_start > circle_peird && abs(yaw_angle_now - yaw_angle_start) < light_angle) {
-			mag_delta = VADCresult[3] - mag_VADC3or4_doubleline;//左侧出现多赛道，分岔路屏蔽右电磁值
-    	}
+
+    	} else if (circle_flag == -1 && mag_sum > mag_circle_sum_judge &&
+                   keep_now - keep_start > circle_peird &&
+                   abs(yaw_angle_now - yaw_angle_start) < light_angle) {
+
+            mag_delta = VADCresult[3] - mag_VADC3or4_doubleline;//左侧出现多赛道，分岔路屏蔽右电磁值
+    	
+        }
 		
-		if (circle_flag == 1 && mag_sum > mag_circle_sum_judge && abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
-			mag_delta = VADCresult[3] - mag_VADC3or4_doubleline;//将要走出环岛，已到达分岔口时，屏蔽右侧电磁值，一路顺风
-		} else if (circle_flag == -1 && mag_sum > mag_circle_sum_judge && abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
-			mag_delta = mag_VADC3or4_doubleline - VADCresult[4];//将要走出环岛，已到达分岔口时，屏蔽右侧电磁值，一路顺风
-		}
+        if (circle_flag == 1 && mag_sum > mag_circle_sum_judge &&
+            abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
+
+            mag_delta = VADCresult[3] - mag_VADC3or4_doubleline;//将要走出环岛，已到达分岔口时，屏蔽右侧电磁值，一路顺风
+
+        } else if (circle_flag == -1 && mag_sum > mag_circle_sum_judge &&
+                   abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
+
+            mag_delta = mag_VADC3or4_doubleline - VADCresult[4];//将要走出环岛，已到达分岔口时，屏蔽右侧电磁值，一路顺风
+
+        }
 		
-    	if (circle_flag == 1 && mag_sum < mag_singalline && abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
+        if (circle_flag_2 != 1 && circle_flag != 0 && abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
+            circle_flag_2 = 1;
+            keep_start_2 = timecounter10 / 100;
+        }
+		
+        if (circle_flag_2 == 1) {
+            keep_now_2 = timecounter10 / 100;
+        }
+		
+    	if (circle_flag_2 == 1 && circle_flag == 1 && mag_sum < mag_singalline &&
+            abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20 &&
+            keep_now_2 - keep_start_2 > leave_circle_time) {
+
             circle_flag = 0;//若驶出多股赛道，恢复单赛道状态
             keep_now = 0;
-    	} else if (circle_flag == -1 && mag_sum < mag_singalline && abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
+            circle_flag_2 = 0;
+            SetLed(4, 1);
+
+    	} else if (circle_flag_2 == 1 && circle_flag == -1 && mag_sum < mag_singalline &&
+                   abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20 && 
+                   keep_now_2 - keep_start_2 > leave_circle_time) {
+
             circle_flag = 0;
             keep_now = 0;
+            circle_flag_2 = 0;
+            SetLed(3, 1);
     	}
 
         if (mag_delta > mag_delta_thresh) {
@@ -236,41 +285,42 @@ void SelfDrive(void) {
             myangle = mag_delta_kp * mag_delta;
             if (myangle < -steer_limit) myangle = -steer_limit;
         } else myangle = 0;
-		motor_speed = speed_set;
-		motor_speed += kp_enc_motor * (CodePerid_target - CodePerid) / 200;
-		motor_speed -= kp_enc_angle * abs(myangle);
-		if (motor_speed > 100) motor_speed = 100;
-		if (motor_speed < 40) motor_speed = 40;
-		if (CodePerid < 500) motor_speed = 100; 
-		if (abs(myangle) < 20) motor_speed = 100;
+        motor_speed = speed_set;
+        motor_speed += kp_enc_motor * (CodePerid_target - CodePerid) / 200;
+        motor_speed -= kp_enc_angle * abs(myangle);
+        if (motor_speed > 100) motor_speed = 100;
+        else if (motor_speed < speed_min) motor_speed = speed_min;
+        if (CodePerid < 500) motor_speed = 90; 
+        //if (abs(myangle) < 20) motor_speed = 90;//走直线时加速
         steer_angle(myangle);
         motor_duty(-motor_speed);// why neg?
     }
 	
-	//停车入库 等待摄像机给出入库的信号 
-	yaw_angle_start = mpudata_int[6];
-	while (1) {
-		yaw_angle_now = mpudata_int[6];
-		myangle = -90;
-		motor_speed = 40;
-		if (CodePerid < 300) motor_speed = 75;
-		if (abs(yaw_angle_now - yaw_angle_start) > 80) break;
-	}
-	keep_start = timecounter10 / 100;
-	while (1) {
-		keep_now = timecounter10 / 100;
-		myangle = 90;
-		steer_angle(myangle);
-		if (keep_now - keep_start > 0.2) break; 
-	}
-	while (1) {
-		keep_now = timecounter10 / 100;
-		myangle = -90;
-		steer_angle(myangle);
-		if (keep_now - keep_start > 0.4) break;
-	}
-	
+    //停车入库 等待摄像机给出入库的信号 
+    yaw_angle_start = mpudata_int[6];
+    while (1) {
+        yaw_angle_now = mpudata_int[6];
+        myangle = -90;
+        motor_speed = 40;
+        if (CodePerid < 300) motor_speed = 75;
+        if (abs(yaw_angle_now - yaw_angle_start) > 80) break;
+    }
+    keep_start = timecounter10 / 100;
+    while (1) {
+        keep_now = timecounter10 / 100;
+        myangle = 90;
+        steer_angle(myangle);
+        if (keep_now - keep_start > 0.2) break; 
+    }
+    while (1) {
+        keep_now = timecounter10 / 100;
+        myangle = -90;
+        steer_angle(myangle);
+        if (keep_now - keep_start > 0.4) break;
+    }
 }
+
+
 
 
 /*****************************主函数***********************************/
@@ -334,8 +384,8 @@ uint32 UserInterupt10ms(void)
 //样例，获取编码器输出频率与超声举例
 uint32 UserInterupt100ms(void)
 {
-	distance=get_echo_length();
-	MPU6050_Get_Data();//新写的陀螺仪测定
+	distance=get_echo_length();//每100ms更新一次超声波
+	MPU6050_Get_Data();//每100ms更新一次陀螺仪
 	return 0;
 }
 //该函数每1000ms执行一次，请在该函数中书写程序，中断时间有限，不要太长

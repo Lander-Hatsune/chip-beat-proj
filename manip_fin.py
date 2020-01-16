@@ -9,8 +9,8 @@ from pygame.locals import *
 **Aurix Keymap**
 
 *preset:
-'W': motor forward
-'S': motor backward
+'W': motor backward
+'S': motor forward
 'A': steer left
 'D': steer right
 'E': all clear
@@ -18,6 +18,7 @@ from pygame.locals import *
 *adjusted set
 'Z': steer origin
 'X': motor origin
+'C': de-ja vu
 '''
 
 # basic parameters --begin
@@ -30,14 +31,15 @@ _parity = serial.PARITY_NONE
 _stopbits = 1
 _bytesize = 8
 #2 about manip
-_frame_spd = 100
+_frame_spd = 30
 _move_fwrd = K_w
 _move_back = K_s
 _steer_left = K_a
 _steer_right = K_d
+_rush = K_LSHIFT
 #3 moving and turning constants
-_motor_thresh = 100
-_steer_thresh = 50
+_motor_thresh = 1
+_steer_thresh = 1
 # basic parameters --end
 
 # serial output
@@ -49,7 +51,7 @@ def Put(msg):
         #raise SystemExit(msg)
 
 # steering and motoring of car
-def Motion(key):
+def Motion(key, w_key):
     if key == _move_fwrd:
         print("forwarding")
         Put('S' * _motor_thresh)
@@ -62,9 +64,13 @@ def Motion(key):
     elif key == _steer_left:
         print("left steering")
         Put('A' * _steer_thresh)
+    elif key == _rush and w_key:
+        print("DE JA VUUUUUUUUUUUUUUUU")
+        Put('S' * 2)
+        
 
 # reverse car to original state
-def Restore(key, a_key, d_key):
+def Restore(key, a_key, d_key, w_key):
     if key in (_move_fwrd, _move_back):
         print("stop motor")
         Put('X')
@@ -78,6 +84,12 @@ def Restore(key, a_key, d_key):
             print("originate from right")
             Put('Z')
         else: print("ignored originate from right")
+    elif key == _rush:
+        if w_key:
+            print("originate norm speed")
+            Put('XS')
+
+            
 
     
 def main():
@@ -96,15 +108,15 @@ def main():
         keylist = pygame.key.get_pressed()
         a_key = keylist[K_a]
         d_key = keylist[K_d]
-        
+        w_key = keylist[K_w]
         for event in pygame.event.get():
             if event.type == QUIT:
                 return
             elif event.type == KEYDOWN:
                 if event.key == K_ESCAPE: return
-                Motion(event.key)
+                Motion(event.key, w_key)
             elif event.type == KEYUP:
-                Restore(event.key, a_key, d_key)
+                Restore(event.key, a_key, d_key, w_key)
 
         
         

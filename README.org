@@ -1,11 +1,9 @@
 #+STARTUP: indent
-#+TITLE: (unstable) S&RCv1.1
+#+TITLE: (Stable) S&RCv2.0
 * upd log
-** <2020-01-09 ÖÜËÄ>:
-encoder PID
+Already done bluetooth control with manip_fin.py
 
-into garage control
+Stable 360 turn
 
-better(maybe) mag-system control
-
-gyro judge
+* todo
+camera
