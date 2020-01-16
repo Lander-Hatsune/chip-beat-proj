@@ -1,9 +1,11 @@
-* Stable-S&RC v1.0
-** speciality
-*stable on bluetooth RC control, stable on Self driving*
-*unable to transmit pictures with camera, bps = 9600*
-*good enough elec-mag system*
-** to do
-better PID of encoder
+#+STARTUP: indent
+#+TITLE: (unstable) S&RCv1.1
+* upd log
+** <2020-01-09 ÖÜËÄ>:
+encoder PID
 
-camera image process apply
+into garage control
+
+better(maybe) mag-system control
+
+gyro judge
