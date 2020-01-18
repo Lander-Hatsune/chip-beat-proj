@@ -11,7 +11,7 @@ float mpudata[7]={0,0,0,0,0,0,0};//角速度、加速度数据
 float mpudata_int[7]={0,0,0,0,0,0,0};//积分数据，代表速度或者角度
 
 float offset[7]={0,0,0,0,0,0,0};//标定得到的offset，默认为0// done
-float factor[7]={0,1,1,1,1,1,17.3041};//标定得到的factor，默认为1// done
+float factor[7]={0,1,1,1,1,1,17};//标定得到的factor，默认为1// done
 
 float offset_test[7]={0,0,0,0,0,0,0};
 float factor_test[7]={0,0,0,0,0,0,0};

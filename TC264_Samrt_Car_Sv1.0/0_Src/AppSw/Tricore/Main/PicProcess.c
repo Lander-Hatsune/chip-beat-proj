@@ -1,5 +1,5 @@
-#include "CameraOV7620.h"
-#include "PicProcess.h"
+//#include "CameraOV7620.h"
+//#include "PicProcess.h"
 /*
 extern float _eigen[2][48][53];
 

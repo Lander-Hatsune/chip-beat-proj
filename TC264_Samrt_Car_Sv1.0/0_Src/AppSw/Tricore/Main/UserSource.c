@@ -1,30 +1,40 @@
 
 /******************************************************************************/
-/*----------------------------------ÒıÓÃ---------------------------------------*/
+/*----------------------------------å¼•ç”¨---------------------------------------*/
 /******************************************************************************/
 #include "UserSource.h"
 #include "ServeSource.h"
 #include "VadcApp.h"
 #include "Mpu6050.h"
-//#include "PicProcess.c"
+#include "PicProcess.h"
 int timecounter10 = 0;
 
 /******************************************************************************/
-/*---------------------------------ÓÃ»§±äÁ¿¶¨Òå-----------------------------------*/
+/*--------ç”¨-------------------------æˆ·å˜é‡å®šä¹‰-----------------------------------*/
 /******************************************************************************/
 uint8 ctldata=0;
-int CodePerid = 0;
+int CodePerid = 0;//ç¼–ç å™¨é¢‘ç‡
 int CodePerid_prev = 0;
-float yaw_angle_start = 0;
-float yaw_angle_now = 0;
-float keep_start = 0.0, keep_now = 0.0;
-float distance;
+float yaw_angle_start = 0;//å¼€å§‹yaw
+float yaw_angle_now = 0;//æ›´æ–°yaw
+float keep_start = 0.0, keep_now = 0.0;//å¼€å§‹æ—¶é—´ æ›´æ–°æ—¶é—´
+float wave_distance;//è¶…å£°æ³¢è·ç¦»
+float distance_cross_bar = -1e8;//åˆ¤æ–­å‰æ–¹æœ‰æœ¨å—éšœç¢çš„è·ç¦»èŒƒå›´
 uint8 reed_state = 0;// 0 with magnet
+int kp_distance = 10810;//ç¼–ç å™¨ç´¯åŠ æ±‚è·¯ç¨‹çš„æ¯”ä¾‹ç³»æ•°
+float distance = 0.0;//ç»å¯¹è·¯ç¨‹
+int distance_start = 0;//å¼€å§‹è·¯ç¨‹
+int distance_now = 0;//æ›´æ–°è·¯ç¨‹
+int _camera_recog_mode;
+// 0ï¼šå‘å·¦è½¬ 1ï¼šå‘å³è½¬ 2ï¼šæœ‰æ–‘é©¬çº¿ -1ï¼šæ­£å¸¸çŠ¶æ€
 /******************************************************************************/
-/*----------------------------------ÓÃ»§º¯Êı------------------------------------*/
+/*----------------------------------ç”¨æˆ·å‡½æ•°------------------------------------*/
 /******************************************************************************/
-//º¯Êı¼°º¯ÊıÓÃ·¨
-void motor_duty(int duty)//ÑùÀıÓÃ»§×ÔÉí¶æ»úº¯Êı
+float abs(float x) {
+	return x < 0 ? -x : x;
+}
+//å‡½æ•°åŠå‡½æ•°ç”¨æ³•
+void motor_duty(int duty)//æ ·ä¾‹ç”¨æˆ·è‡ªèº«èˆµæœºå‡½æ•°
 {
     if (duty>0)
         SetMotor(FORWARD, duty);
@@ -122,69 +132,114 @@ void RemoteControl(void) {
     _myangle_window = NULL;
     _myduty_window = NULL;
 }
-
+/*
 float abs(float num) {
     return num < 0.0 ? -num : num;
+}
+*/
+void CrossBarrier() {
+    /*
+    float start_point = distance;
+    float cur_dis = distance - start_point;
+    // relevant parameters --start
+    int bias_angle = 30;
+    int bias_dis = 130;
+    int strait_dis = 20;
+    // parameters --end
+    steer_angle(bias_angle);
+    while (cur_dis < bias_dis)
+        cur_dis = distance - start_point;
+    
+    steer_angle(-bias_angle);
+    while (cur_dis < bias_dis + strait_dis)
+        cur_dis = distance - start_point;
+    
+    steer_angle(-bias_angle);
+    while (cur_dis < bias_dis + strait_dis + bias_dis)
+        cur_dis = distance - start_point;
+    
+    steer_angle(bias_angle);
+    */
+    return;
 }
 
 int circle_flag = 0;
 int circle_flag_2 = 0;
-void SelfDrive(void) {
+int crossbar_flag = 0;
+void SelfDrive(void) {//è‡ªåŠ¨é©¾é©¶æ¨¡å¼
+    int i = 0;
+    uint8 inp;
     //&& freq_sum
     // relevant constants --begin
-	int light_angle = 90;
+    int light_angle = 90;
     int mag_delta_thresh = 100;// when to start steering
-    double mag_delta_kp = 0.04;//wait to change
+    double mag_delta_kp = 0.055;//wait to change
     int steer_limit = 100;     // max steering limit
-    int speed_set = 60;
-	int speed_min = 20;
-    int mag_circle_sum_judge = 9000;//judge to cross a circle
-    int mag_circle_oneside_judge = 4000;
+    int speed_set = 40;
+    int speed_min = 20;
+    int mag_circle_sum_judge = 9505;//judge to cross a circle
+    int mag_circle_oneside_judge = 3200;
     int mag_singalline = 5000;
     int mag_VADC3or4_doubleline = 1000;
     float kp_enc_motor = 1.33;
-    float kp_enc_angle = 0.3;
-    int CodePerid_target = 4000;//Ô­ÉèÖÃÊı¾İÎª6000£¬17ÈÕÁè³¿µ÷ÊÔÊ±µçÁ¿³äÂú£¬µ÷ÕûÎª4000
-    float circle_peird = 1;
-	float leave_circle_time = 2;
+    float kp_enc_angle = 0.1;//è¿‡å¼¯å‡é€Ÿ
+    int CodePerid_target = 3500;//åŸè®¾ç½®æ•°æ®ä¸º6000ï¼Œ17æ—¥å‡Œæ™¨è°ƒè¯•æ—¶ç”µé‡å……æ»¡ï¼Œè°ƒæ•´ä¸º4000,37cm/så¯¹åº”4000
+    float circle_peird = 0.3;
+    float leave_circle_time = 2;
+    int circle_zhouchang = 1000;//ç¯å²›çš„å‘¨é•¿ å•ä½å˜ç±³
+    int mag_sum_cross = 6000;//ç»è¿‡åå­—è·¯å£å¼€å§‹è½¬å‘æ—¶6ä¸ªä¼ æ„Ÿå™¨çš„å’Œçš„è®¾å®šå€¼
     // constants --end
 	
     int motor_speed = 0;
     int mag_sum = 0, mag_delta = 0, myangle = 0;
     int left_mag_sum = 0, right_mag_sum = 0, mag_oneside = 0;
-	float keep_start_2 = 0.0, keep_now_2 = 0.0;
+    float keep_start_2 = 0.0, keep_now_2 = 0.0;
+    int change_dir = 0;//è¯†åˆ«å‡ºæ ‡å¿—åç›´æ¥è½¬å‘ 1å‘å·¦è½¬ï¼› -1å‘å³è½¬
+    int sczgsz_flag = 0;
 
     _myangle_window = &myangle;
     _myduty_window = &motor_speed;
     
-    
-	/*
-    //ÓÒ×ª³ö³µ¿â
-    while (1) {//Ö±Ïß³öÈüµÀ Ö±µ½¸ĞÊÜµ½´ÅÁ¦
+
+    //å»¶æ—¶
+    while (1) {
+        if (timecounter10 > 150) break;
+        steer_angle(myangle);
+        motor_duty(0);
+    }
+
+    //å³è½¬å‡ºè½¦åº“
+    while (1) {//ç›´çº¿å‡ºèµ›é“ ç›´åˆ°æ„Ÿå—åˆ°ç£åŠ›
         myangle = 0;
         motor_speed = 40;
-        if (CodePerid < 300) motor_speed = 80;//ÃÅãĞÖµÆô¶¯µç»ú 
+        if (CodePerid < 300) motor_speed = 80;//é—¨é˜ˆå€¼å¯åŠ¨ç”µæœº
         steer_angle(myangle);
         motor_duty(-motor_speed);// why neg?
         if (!reed_state) break;
     }
-    yaw_angle_start = mpudata_int[6];// counter-clockwise: +  ¼ÇÂ¼ÆğÊ¼ÍÓÂİÒÇ
+
+    SetLed(1, 0);
+	SetLed(2, 0);
+	SetLed(3, 0);
+	SetLed(4, 0);
+    yaw_angle_start = mpudata_int[6];// counter-clockwise: positive è®°å½•èµ·å§‹é™€èºä»ª
     while (1) {
-        myangle = -90;//ÓÒ×ª³öÈüµÀ
-        yaw_angle_now = mpudata_int[6];//¸üĞÂÍÓÂİÒÇ
-        motor_speed = 40;
+        myangle = -100;//å³è½¬å‡ºèµ›é“
+        yaw_angle_now = mpudata_int[6];//æ›´æ–°é™€èºä»ª
+        motor_speed = 60;
         if (CodePerid < 500) motor_speed = 80;
-        if (abs(yaw_angle_now - yaw_angle_start) > light_angle - 15) break;
+        if (abs(yaw_angle_now - yaw_angle_start) > light_angle - 10) break;
         steer_angle(myangle);
         motor_duty(-motor_speed);// why neg?
     }
-	*/
-    
-    //¿ªÊ¼×ÔÖ÷Ñ²Ïß½×¶Î
+
+    //å¼€å§‹è‡ªä¸»å·¡çº¿é˜¶æ®µ
+    SetLed(1, 1);
     SetLed(2, 1);
     SetLed(3, 1);
     SetLed(4, 1);
     circle_flag = 0;
+    sczgsz_flag = 0;
     while (1) {
     	myangle = 0;
     	VADCresult_run();
@@ -196,113 +251,304 @@ void SelfDrive(void) {
         mag_delta = VADCresult[3] - VADCresult[4];
         mag_oneside = VADCresult[5] + VADCresult[6] -VADCresult[1] - VADCresult[2];
         //right minus left
-        if (circle_flag == 0) {
-            if (mag_sum > mag_circle_sum_judge &&
-                mag_oneside > mag_circle_oneside_judge &&
-                VADCresult[6] - VADCresult[1] > 2000) {
-                
-                circle_flag = 1;//ÓÒ²à³öÏÖ¶àÈüµÀ
-                SetLed(4, 0);//ÉÔºó¿É×¢ÊÍ  0ÊÇÁÁ
-                keep_start = (float)timecounter10 / 100;//¿ªÊ¼¼ÇÂ¼Ê±¼ä
-                yaw_angle_start = mpudata_int[6];//¿ªÊ¼¼ÇÂ¼yaw
-
-            } else if (mag_sum > mag_circle_sum_judge &&
-                       mag_oneside < -mag_circle_oneside_judge &&
-                       VADCresult[1] - VADCresult[6] > 2000) {
-
-                circle_flag = -1;//×ó²à³öÏÖ¶àÈüµÀ
-                SetLed(3, 0);//ÉÔºó¿É×¢ÊÍ
-                yaw_angle_start = mpudata_int[6];
-                keep_start = (float)timecounter10 / 100;
-
-            }
-        }//ÅĞ¶¨½øÈë»·µº
-        if (circle_flag != 0) {
-            keep_now = (float)timecounter10 / 100;//¸üĞÂÊ±¼äµÄÖµ µ¥Î»ÊÇs
-            if (mpudata_int[6] != 0) //¸üĞÂÍÓÂİÒÇµÄÊıÖµ
-                yaw_angle_now = mpudata_int[6];
-            if (keep_now - keep_start < circle_peird) mag_delta = 0;//0.xÃëÖ®ÄÚ²»µ÷Õû½Ç¶È
-        }//½øÈë»·µº¿ªÊ¼¼ÆÊ± ¼ÇÂ¼ÍÓÂİÒÇ
-
-    	if (circle_flag == 1 && mag_sum > mag_circle_sum_judge &&
-            keep_now - keep_start > circle_peird &&
-            abs(yaw_angle_now - yaw_angle_start) < light_angle) {
-
-            mag_delta = mag_VADC3or4_doubleline - VADCresult[4];//ÓÒ²à³öÏÖ¶àÈüµÀ£¬·Ö²íÂ·ÆÁ±Î×óµç´ÅÖµ
-
-    	} else if (circle_flag == -1 && mag_sum > mag_circle_sum_judge &&
-                   keep_now - keep_start > circle_peird &&
-                   abs(yaw_angle_now - yaw_angle_start) < light_angle) {
-
-            mag_delta = VADCresult[3] - mag_VADC3or4_doubleline;//×ó²à³öÏÖ¶àÈüµÀ£¬·Ö²íÂ·ÆÁ±ÎÓÒµç´ÅÖµ
-    	
+        inp = Bluetooth_Read_Data();
+        if (inp != 0) {
+            ctldata = inp;
         }
-		
-        if (circle_flag == 1 && mag_sum > mag_circle_sum_judge &&
-            abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
+        if (ctldata == 'D' && sczgsz_flag == 0) {
+        	ctldata = 'd';
+        	while(1) {
+        		inp = Bluetooth_Read_Data();
+        		if (inp != 0) {
+        			ctldata = inp;
+        		}
+        		myangle = 0;
+        		VADCresult_run();
+        		mag_sum = VADCresult[1] + VADCresult[2] + VADCresult[3] +
+        				VADCresult[4] + VADCresult[5] + VADCresult[6];
+        		// left minus right
+        		left_mag_sum  = VADCresult[1] + VADCresult[2];
+        		right_mag_sum = VADCresult[5] + VADCresult[6];
+        		mag_delta = VADCresult[3] - VADCresult[4];
+        		mag_oneside = VADCresult[5] + VADCresult[6] -VADCresult[1] - VADCresult[2];
 
-            mag_delta = VADCresult[3] - mag_VADC3or4_doubleline;//½«Òª×ß³ö»·µº£¬ÒÑµ½´ï·Ö²í¿ÚÊ±£¬ÆÁ±ÎÓÒ²àµç´ÅÖµ£¬Ò»Â·Ë³·ç
+        		if (mag_sum > mag_sum_cross && sczgsz_flag == 0) {
+        			sczgsz_flag = 1;
+        			distance_start = distance;
+        			keep_start = timecounter10;
+        			yaw_angle_start = mpudata_int[6];
+        		}
+        		if (sczgsz_flag == 1) {
+        			keep_now = timecounter10;
+        			distance_now = distance;
+        			yaw_angle_start = mpudata_int[6];
+        			mag_delta = -2500;
+        			if (keep_now - keep_start > 900 || abs(yaw_angle_now - yaw_angle_start) > 75 || distance_now - distance_start > 45) {
+        				sczgsz_flag = -1;
+        				break;
+        			}
+        		}
 
-        } else if (circle_flag == -1 && mag_sum > mag_circle_sum_judge &&
-                   abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
-
-            mag_delta = mag_VADC3or4_doubleline - VADCresult[4];//½«Òª×ß³ö»·µº£¬ÒÑµ½´ï·Ö²í¿ÚÊ±£¬ÆÁ±ÎÓÒ²àµç´ÅÖµ£¬Ò»Â·Ë³·ç
-
+        		if (mag_delta > mag_delta_thresh) {
+        			myangle = mag_delta_kp * mag_delta;//+ left; - right
+        			if (myangle > steer_limit) myangle = steer_limit;
+        		} else if (mag_delta < -mag_delta_thresh) {
+        			myangle = mag_delta_kp * mag_delta;
+        			if (myangle < -steer_limit) myangle = -steer_limit;
+        		} else myangle = 0;
+        		motor_speed = speed_set;
+        		motor_speed += kp_enc_motor * (CodePerid_target - CodePerid) / 200;
+        		motor_speed -= kp_enc_angle * abs(myangle);//ï½¹ï£±ï¾è¨î¶ï¾™
+        		if (motor_speed > 100) motor_speed = 100;
+        		else if (motor_speed < speed_min) motor_speed = speed_min;
+        		if (CodePerid < 500) motor_speed = 90;
+        		steer_angle(myangle);
+        		motor_duty(-motor_speed);// why neg?
+        	}
         }
-		
-        if (circle_flag_2 != 1 && circle_flag != 0 && abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
-            circle_flag_2 = 1;
-            keep_start_2 = timecounter10 / 100;
+
+        //_camera_recog_mode 0ï¼šå‘å·¦è½¬ 1ï¼šå‘å³è½¬ 2ï¼šæœ‰æ–‘é©¬çº¿ -1ï¼šæ­£å¸¸çŠ¶æ€
+
+        if (_camera_recog_mode == -1) {//æ­£å¸¸çŠ¶æ€
+        	if (!reed_state) {
+        		SetLed(1, 0);
+        		SetLed(2, 0);
+        		SetLed(3, 0);
+        		SetLed(4, 0);
+        		break;//åœè½¦å…¥åº“
+        	}
+
+        	if (wave_distance < distance_cross_bar) {
+        		SetLed(1, 1);
+        		SetLed(2, 0);
+        		SetLed(3, 0);//ä¸­é—´ä¸¤ä¸ªLEDäº®èµ·
+        		SetLed(4, 1);
+        		crossbar_flag == 1;//è¿›å…¥é¿éšœæ¨¡å¼
+        		distance_start = distance;
+        	}
+        	if (crossbar_flag == 1) {
+        		distance_now = distance;
+        	}
+
+        	if (crossbar_flag == 0) {
+        		if (circle_flag == 0) {
+        			if (mag_sum > mag_circle_sum_judge &&
+        					mag_oneside > mag_circle_oneside_judge &&
+							VADCresult[6] - VADCresult[1] > 2000 &&
+							timecounter10 > 1000) {
+
+        				circle_flag = 1;//å³ä¾§å‡ºç°å¤šèµ›é“
+        				SetLed(1, 1);
+        				SetLed(2, 1);
+        				SetLed(3, 1);
+        				SetLed(4, 0);//äº®
+        				keep_start = (float)timecounter10 / 100;//å¼€å§‹è®°å½•æ—¶é—´
+        				yaw_angle_start = mpudata_int[6];//å¼€å§‹è®°å½•yaw
+        				distance_start = distance;
+        			} else if (mag_sum > mag_circle_sum_judge &&
+        					mag_oneside < -mag_circle_oneside_judge &&
+							VADCresult[1] - VADCresult[6] > 2000 &&
+							timecounter10 > 1000) {
+
+        				circle_flag = -1;//å·¦ä¾§å‡ºç°å¤šèµ›é“
+        				SetLed(1, 0);//äº®
+        				SetLed(2, 1);
+        				SetLed(3, 1);
+        				SetLed(4, 1);
+        				yaw_angle_start = mpudata_int[6];
+        				keep_start = (float)timecounter10 / 100;
+        				distance_start = distance;
+        			}
+        		}//åˆ¤å®šè¿›å…¥ç¯å²›
+        		if (circle_flag != 0) {
+        			keep_now = (float)timecounter10 / 100;//æ›´æ–°æ—¶é—´çš„å€¼ å•ä½æ˜¯s
+        			distance_now = distance;
+        			if (mpudata_int[6] != 0) //æ›´æ–°é™€èºä»ªçš„æ•°å€¼
+        				yaw_angle_now = mpudata_int[6];
+        			if (keep_now - keep_start < circle_peird) mag_delta = 0;//0.xç§’ä¹‹å†…ä¸è°ƒæ•´è§’åº¦
+        		}//è¿›å…¥ç¯å²›å¼€å§‹è®¡æ—¶ è®°å½•é™€èºä»ª
+
+        		if (circle_flag == 1 && mag_sum > mag_circle_sum_judge &&
+        				keep_now - keep_start > circle_peird &&
+						abs(yaw_angle_now - yaw_angle_start) < light_angle) {
+
+        			mag_delta = mag_VADC3or4_doubleline - VADCresult[4];//å³ä¾§å‡ºç°å¤šèµ›é“ï¼Œåˆ†å²”è·¯å±è”½å·¦ç”µç£å€¼
+
+        		} else if (circle_flag == -1 && mag_sum > mag_circle_sum_judge &&
+        				keep_now - keep_start > circle_peird &&
+						abs(yaw_angle_now - yaw_angle_start) < light_angle) {
+
+        			mag_delta = VADCresult[3] - mag_VADC3or4_doubleline;//å·¦ä¾§å‡ºç°å¤šèµ›é“ï¼Œåˆ†å²”è·¯å±è”½å³ç”µç£å€¼
+
+        		}
+
+        		if (circle_flag == 1 && mag_sum > mag_circle_sum_judge - 1000 &&
+        				abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
+
+        			mag_delta = VADCresult[3] - mag_VADC3or4_doubleline;//å°†è¦èµ°å‡ºç¯å²›ï¼Œå·²åˆ°è¾¾åˆ†å²”å£æ—¶ï¼Œå±è”½å³ä¾§ç”µç£å€¼ï¼Œä¸€è·¯é¡ºé£
+
+        		} else if (circle_flag == -1 && mag_sum > mag_circle_sum_judge - 1000 &&
+        				abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
+
+        			mag_delta = mag_VADC3or4_doubleline - VADCresult[4];//å°†è¦èµ°å‡ºç¯å²›ï¼Œå·²åˆ°è¾¾åˆ†å²”å£æ—¶ï¼Œå±è”½å³ä¾§ç”µç£å€¼ï¼Œä¸€è·¯é¡ºé£
+
+        		}
+
+        		if (circle_flag_2 != 1 && circle_flag != 0 && abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20) {
+        			circle_flag_2 = 1;
+        			keep_start_2 = timecounter10 / 100;
+        		}
+
+        		if (circle_flag_2 == 1) {
+        			keep_now_2 = timecounter10 / 100;
+        		}
+
+        		if (circle_flag_2 == 1 && circle_flag == 1 && mag_sum < mag_singalline &&
+        				abs(abs(yaw_angle_now - yaw_angle_start) - 360) < 20 &&
+						keep_now_2 - keep_start_2 > leave_circle_time &&
+						distance_now - distance_start > circle_zhouchang) {
+
+        			circle_flag = 0;//è‹¥é©¶å‡ºå¤šè‚¡èµ›é“ï¼Œæ¢å¤å•èµ›é“çŠ¶æ€
+        			keep_now = 0;
+        			circle_flag_2 = 0;
+        			SetLed(1, 1);
+        			SetLed(2, 1);
+        			SetLed(3, 1);
+        			SetLed(4, 1);
+        		} else if (circle_flag_2 == 1 && circle_flag == -1 && mag_sum < mag_singalline &&
+        				abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20 &&
+						keep_now_2 - keep_start_2 > leave_circle_time &&
+						distance_now - distance_start > circle_zhouchang) {
+
+        			circle_flag = 0;
+        			keep_now = 0;
+        			circle_flag_2 = 0;
+        			SetLed(1, 1);
+        			SetLed(2, 1);
+        			SetLed(3, 1);
+        			SetLed(4, 1);
+
+        		}
+        	} else if (crossbar_flag == 1) {
+        		CrossBarrier();
+        	}
+        } else if (_camera_recog_mode == 0 && change_dir == 0 ) {//å‘å·¦è½¬
+        	change_dir =  1;
+        	SetLed(1, 0);
+        	SetLed(2, 0);
+        	SetLed(3, 1);
+        	SetLed(4, 1);//å·¦ä¾§ä¸¤ä¸ªLEDäº®
+        	yaw_angle_start = mpudata_int[6];
+        } else if (_camera_recog_mode == 1 && change_dir == 0) {//å‘å³è½¬
+        	change_dir = -1;
+        	SetLed(1, 1);
+        	SetLed(2, 1);
+        	SetLed(3, 0);
+        	SetLed(4, 0);//å³ä¾§ä¸¤ä¸ªLEDäº®
+        	yaw_angle_start = mpudata_int[6];
         }
-		
-        if (circle_flag_2 == 1) {
-            keep_now_2 = timecounter10 / 100;
+
+        /**************ç©¿è¶Šåå­—è·¯å£*******************/
+        if (change_dir != 0) {
+        	yaw_angle_now = mpudata_int[6];
         }
-		
-    	if (circle_flag_2 == 1 && circle_flag == 1 && mag_sum < mag_singalline &&
-            abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20 &&
-            keep_now_2 - keep_start_2 > leave_circle_time) {
 
-            circle_flag = 0;//ÈôÊ»³ö¶à¹ÉÈüµÀ£¬»Ö¸´µ¥ÈüµÀ×´Ì¬
-            keep_now = 0;
-            circle_flag_2 = 0;
-            SetLed(4, 1);
-
-    	} else if (circle_flag_2 == 1 && circle_flag == -1 && mag_sum < mag_singalline &&
-                   abs(abs(yaw_angle_now - yaw_angle_start) - light_angle * 4) < 20 && 
-                   keep_now_2 - keep_start_2 > leave_circle_time) {
-
-            circle_flag = 0;
-            keep_now = 0;
-            circle_flag_2 = 0;
-            SetLed(3, 1);
-    	}
+        if (change_dir == 1 && mag_sum > mag_sum_cross) {
+        	change_dir =  2;
+        } else if (change_dir == -1 && mag_sum > mag_sum_cross) {
+        	change_dir = -2;
+        }
+        if (change_dir == 2 && abs(yaw_angle_now - yaw_angle_start) < light_angle - 10) {//å¼€å§‹å·¦è½¬
+        	mag_delta =  2500;//å¯¹åº”myangle=100
+        } else if (change_dir == -2 && abs(yaw_angle_now - yaw_angle_start) < light_angle - 10) {//å¼€å§‹å³è½¬
+        	mag_delta = -2500;//å¯¹åº”myangle=-100
+        }
+        if (abs(yaw_angle_now - yaw_angle_start) > light_angle - 10) {
+        	change_dir = 0;
+        	SetLed(1, 1);
+        	SetLed(2, 1);
+        	SetLed(3, 1);
+        	SetLed(4, 1);//å®Œæˆç©¿è¶Šåå­—è·¯å£ï¼Œæ‰€æœ‰ç¯ç†„ç­
+        }
+        /**************ç©¿è¶Šåå­—è·¯å£ä»£ç ç»“æŸ**********/
 
         if (mag_delta > mag_delta_thresh) {
-            myangle = mag_delta_kp * mag_delta;
-            if (myangle > steer_limit) myangle = steer_limit;
+        	myangle = mag_delta_kp * mag_delta;//+ left; - right
+        	if (myangle > steer_limit) myangle = steer_limit;
         } else if (mag_delta < -mag_delta_thresh) {
-            myangle = mag_delta_kp * mag_delta;
-            if (myangle < -steer_limit) myangle = -steer_limit;
+        	myangle = mag_delta_kp * mag_delta;
+        	if (myangle < -steer_limit) myangle = -steer_limit;
         } else myangle = 0;
         motor_speed = speed_set;
         motor_speed += kp_enc_motor * (CodePerid_target - CodePerid) / 200;
         motor_speed -= kp_enc_angle * abs(myangle);
         if (motor_speed > 100) motor_speed = 100;
         else if (motor_speed < speed_min) motor_speed = speed_min;
-        if (CodePerid < 500) motor_speed = 90; 
-        //if (abs(myangle) < 20) motor_speed = 90;//×ßÖ±ÏßÊ±¼ÓËÙ
+        if (CodePerid < 500) motor_speed = 90;
+        //if (abs(myangle) < 20) motor_speed = 90;//èµ°ç›´çº¿æ—¶åŠ é€Ÿ
         steer_angle(myangle);
         motor_duty(-motor_speed);// why neg?
+    }//å¤§while(1)ç»“æŸ
+
+
+    //åœè½¦å…¥åº“ ç­‰å¾…å¹²ç°§ç®¡ç»™å‡ºå…¥åº“çš„ä¿¡å·
+    SetLed(1, 0);
+    SetLed(2, 0);
+    SetLed(3, 0);
+    SetLed(4, 0);
+    motor_duty(-30);
+    while (i++ < 5e7);
+    motor_duty(70);
+    steer_angle(-100);
+    while (1);
+    /*
+    keep_start = timecounter10 / 100;
+    motor_duty(0);
+    distance_start = distance;
+    while (abs((float)CodePerid) > 300);
+    distance_now = distance;
+    while (distance_now - distance_start > 200 ) {
+        distance_now = distance;
+        motor_duty(100);
+
+    	motor_speed = 40;
+        motor_speed += kp_enc_motor * (2000 - CodePerid) / 200;
+        motor_speed -= kp_enc_angle * abs(myangle);
+        if (motor_speed > 100) motor_speed = 100;
+        else if (motor_speed < speed_min) motor_speed = speed_min;
+        if (-CodePerid < 500) motor_speed = 90;
+        steer_angle(0);
+        motor_duty(motor_speed);
+
     }
-	
-    //Í£³µÈë¿â µÈ´ıÉãÏñ»ú¸ø³öÈë¿âµÄĞÅºÅ 
+    //while (abs((float)CodePerid) < 500) motor_duty(100);
+    keep_start = timecounter10 / 100;
+    motor_duty(50);//å€’è½¦
+    steer_angle(-100);
+    while (keep_now - keep_start < 2) {
+    	keep_now = timecounter10;
+    }
+    motor_duty(0);
+    */
+    /*
+    distance_start = distance;
+	while (1) {//å€’è½¦
+		myangle = 0;
+		motor_speed = -60;
+		if (CodePerid < 300) motor_speed = -75; 
+		distance_now = distance;
+        steer_angle(myangle);
+        motor_duty(-motor_speed);// why neg?
+		if (distance_now - distance_start > 15) break;//å€’è½¦è·ç¦»ä¸º15cm
+	}
     yaw_angle_start = mpudata_int[6];
     while (1) {
         yaw_angle_now = mpudata_int[6];
         myangle = -90;
         motor_speed = 40;
         if (CodePerid < 300) motor_speed = 75;
+        steer_angle(myangle);
+        motor_duty(-motor_speed);// why neg?
         if (abs(yaw_angle_now - yaw_angle_start) > 80) break;
     }
     keep_start = timecounter10 / 100;
@@ -318,77 +564,83 @@ void SelfDrive(void) {
         steer_angle(myangle);
         if (keep_now - keep_start > 0.4) break;
     }
+    */
 }
 
-
-
-
-/*****************************Ö÷º¯Êı***********************************/
-//CPU0Ö÷º¯Êı£¬ÖÃÓÚÑ­»·ÖĞÓÃ»§Ö÷ÒªÂß¼­¼ÆËãÇø
+/*****************************ä¸»å‡½æ•°***********************************/
+//CPU0ä¸»å‡½æ•°ï¼Œç½®äºå¾ªç¯ä¸­ç”¨æˆ·ä¸»è¦é€»è¾‘è®¡ç®—åŒº
 void UserCpu0Main(void) {
     if (GetDip(1) == TRUE) {
         SetLed(1, 1);// close the light
+        SetLed(2, 1);
+        SetLed(3, 1);
+        SetLed(4, 1);
         SelfDrive();
     } else RemoteControl();
 }
 
-/*
-void Conv(int strd, int h, int w) {
-    int kernal[3][3] = {{1, 0, -1},
-                        {2, 0, -2},
-                        {1, 0, -1}};
-    for (int i = 0; i <= h - strd + 1; i += strd) {
-        for (int j = 0; j <= w - strd + 1; j += strd) {
-            int temp_sum = 0;
-            for (int ki = 0; ki < 3; ki++)
-                for (int kj = 0; kj < 3; kj++)
-                    temp_sum += kernal[ki][kj] * pic[i + ki][j + kj];
-            if (temp_sum > thresh) {
-                convout[i][j] = '#';
-            }else if (temp_sum < -thresh) {
-                convout[i][j] = '|';
-            }
-        }
-    }
-}*/
+//CPU1ä¸»å‡½æ•°ï¼Œç½®äºå¾ªç¯ä¸­ï¼Œæ‘„åƒå¤´è¯»å†™ç”±æ­¤æ ¸å¤„ç†ï¼Œå»ºè®®ç”¨äºæ‘„åƒå¤´ç›¸å…³è®¡ç®—ï¼š
+//ä¸è¦å†™æˆæ­»å¾ªç¯ï¼Œåé¢æœ‰ADç›¸å…³å¤„ç†
 
-//CPU1Ö÷º¯Êı£¬ÖÃÓÚÑ­»·ÖĞ£¬ÉãÏñÍ·¶ÁĞ´ÓÉ´ËºË´¦Àí£¬½¨ÒéÓÃÓÚÉãÏñÍ·Ïà¹Ø¼ÆËã£º
-//²»ÒªĞ´³ÉËÀÑ­»·£¬ºóÃæÓĞADÏà¹Ø´¦Àí
+int _judge[2];
 void UserCpu1Main(void) {
     // for test
     //imageRead();
-    //delay_ms(10);
+    // delay_ms(500);
 
     //----------image process and evaluate----------//
 
     // the picture: unsigned int pic[121][161]
-    /*
-    int height = 120, width = 160;
-    int conv_h = (height + 1) / 2, conv_w = (width + 1) / 2;
-    
-    int conv_result[121][161];
-    Conv(2, *conv_result, 120, (height + 1) / 2, (width + 1) / 2);
-    */
+//    int judge_times = 5;// to be twitched
+//    int result = Judge();
+//    if (result == -1) {
+//        _camera_recog_mode = -1;
+//        _judge[0] = _judge[1] = 0;
+//        return;
+//    }
+//    _judge[result] += 1;
+//    if (_judge[result] > judge_times) {
+//        _camera_recog_mode = result;
+//        _judge[0] = _judge[1] = 0;
+//    }
+	_camera_recog_mode = -1;
 }
-/**************************************ÖĞ¶Ïµ÷ÓÃº¯Êı****************************************/
-//¸Ãº¯ÊıÃ¿10msÖ´ĞĞÒ»´Î£¬ÇëÔÚ¸Ãº¯ÊıÖĞÊéĞ´³ÌĞò£¬ÖĞ¶ÏÊ±¼äÓĞÏŞ£¬²»ÒªÌ«³¤
+/**************************************ä¸­æ–­è°ƒç”¨å‡½æ•°****************************************/
+//è¯¥å‡½æ•°æ¯10msæ‰§è¡Œä¸€æ¬¡ï¼Œè¯·åœ¨è¯¥å‡½æ•°ä¸­ä¹¦å†™ç¨‹åºï¼Œä¸­æ–­æ—¶é—´æœ‰é™ï¼Œä¸è¦å¤ªé•¿
 uint32 UserInterupt10ms(void)
 {
-    timecounter10++;
-	CodePerid_prev = CodePerid;
-	CodePerid = GetCodePerid();
-	reed_state = IfxPort_getPinState(&MODULE_P20, 0);
+    timecounter10++;//è®¡æ—¶å™¨
+    CodePerid_prev = CodePerid;
+    CodePerid = GetCodePerid();//ç¼–ç å™¨
+    if (CodePerid > 0x3f3f3f3f || CodePerid < 500) CodePerid = 0;
+    distance += (float)CodePerid / kp_distance;
+    reed_state = IfxPort_getPinState(&MODULE_P20, 0);//å¹²ç°§ç®¡
+    MPU6050_Get_Data();//æ¯10msæ›´æ–°ä¸€æ¬¡é™€èºä»ª
     return 0;
 }
-//¸Ãº¯ÊıÃ¿100msÖ´ĞĞÒ»´Î£¬ÇëÔÚ¸Ãº¯ÊıÖĞÊéĞ´³ÌĞò£¬ÖĞ¶ÏÊ±¼äÓĞÏŞ£¬²»ÒªÌ«³¤
-//ÑùÀı£¬»ñÈ¡±àÂëÆ÷Êä³öÆµÂÊÓë³¬Éù¾ÙÀı
-uint32 UserInterupt100ms(void)
-{
-	distance=get_echo_length();//Ã¿100ms¸üĞÂÒ»´Î³¬Éù²¨
-	MPU6050_Get_Data();//Ã¿100ms¸üĞÂÒ»´ÎÍÓÂİÒÇ
-	return 0;
+//è¯¥å‡½æ•°æ¯100msæ‰§è¡Œä¸€æ¬¡ï¼Œè¯·åœ¨è¯¥å‡½æ•°ä¸­ä¹¦å†™ç¨‹åºï¼Œä¸­æ–­æ—¶é—´æœ‰é™ï¼Œä¸è¦å¤ªé•¿
+//æ ·ä¾‹ï¼Œè·å–ç¼–ç å™¨è¾“å‡ºé¢‘ç‡ä¸è¶…å£°ä¸¾ä¾‹
+/**********hyper-sonic start**********/
+float _queue[7];
+int _queuehead = 0, _queuetail = 4;
+float _queue_sum;
+
+float QueueAdd(float x) {
+    if (x > 400 || x < 10) x = _queue[_queuetail];
+    _queuetail = (_queuetail + 1) % 5;
+    _queue[_queuetail] = x;
+    _queue_sum += x;
+    _queuehead = (_queuehead + 1) % 5;
+    _queue_sum -= _queue[_queuehead];
+    return _queue_sum / 5;
 }
-//¸Ãº¯ÊıÃ¿1000msÖ´ĞĞÒ»´Î£¬ÇëÔÚ¸Ãº¯ÊıÖĞÊéĞ´³ÌĞò£¬ÖĞ¶ÏÊ±¼äÓĞÏŞ£¬²»ÒªÌ«³¤
+uint32 UserInterupt100ms(void) {
+    wave_distance = QueueAdd(get_echo_length());//æ¯100msæ›´æ–°ä¸€æ¬¡è¶…å£°æ³¢
+
+    return 0;
+}
+/**********hyper-sonic end**********/
+//è¯¥å‡½æ•°æ¯1000msæ‰§è¡Œä¸€æ¬¡ï¼Œè¯·åœ¨è¯¥å‡½æ•°ä¸­ä¹¦å†™ç¨‹åºï¼Œä¸­æ–­æ—¶é—´æœ‰é™ï¼Œä¸è¦å¤ªé•¿
 uint32 UserInterupt1000ms(void)
 {
 	return 0;

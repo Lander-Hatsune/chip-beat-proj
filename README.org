@@ -1,9 +1,18 @@
 #+STARTUP: indent
-#+TITLE: (Stable) S&RCv2.0
-* upd log
-Already done bluetooth control with manip_fin.py
+#+TITLE: (Stable) S&RCvFIN
+* announcement
+this repo for THU 2020winter Chip Beat Project, 
+0601group (made up of lzl, TATP, Roufaen, LdrX)
 
-Stable 360 turn
+game is over, no updates anymore.
 
-* todo
-camera
+branch 'master' is the final evaluate code.
+* features
+** stable bluetooth control, boost mode enabled
+** stable out-garaging (put the nose close to signal magnet)
+** stable elec-mag self driving
+** unstable ring island judging & wrapping (enabled)
+** unstable shortcut logo recognizing (disabled)
+** unstable barrier detouring (disabled)
+
+
